@@ -6,22 +6,15 @@ CREATE TABLE Dim_Tiempo (
     dia INT
 );
 
--- Tabla Dim_Actores
-CREATE TABLE Dim_Actores (
-    id_actor INT PRIMARY KEY,
-    nombre VARCHAR(255)
-);
-
 -- Tabla Dim_Peliculas
 CREATE TABLE Dim_Peliculas (
     id_pelicula INT PRIMARY KEY,
     titulo VARCHAR(255),
     anio INT,
+    puntuacion FLOAT,
     duracion INT,
-    plataforma VARCHAR(255),
     idioma_original VARCHAR(255),
-    clasificacion VARCHAR(10),
-    puntuacion FLOAT
+    presupuesto FLOAT
 );
 
 -- Tabla Dim_Directores
@@ -36,7 +29,9 @@ CREATE TABLE Dim_Directores (
 CREATE TABLE Fact_Table (
     id_pelicula INT,
     id_director INT,
-    id_actor INT,
     id_tiempo DATE,
-    prom_puntuacion FLOAT
+    prom_puntuacion FLOAT,
+    cant_votos INT,
+    popularidad FLOAT,
+    recaudacion FLOAT
 );
