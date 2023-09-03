@@ -1,5 +1,5 @@
 -- Tabla Dim_Tiempo
-CREATE TABLE Dim_Tiempo (
+CREATE TABLE IF NOT EXISTS Dim_Tiempo (
     id_tiempo DATE PRIMARY KEY,
     anio INT,
     mes INT,
@@ -7,7 +7,7 @@ CREATE TABLE Dim_Tiempo (
 );
 
 -- Tabla Dim_Peliculas
-CREATE TABLE Dim_Peliculas (
+CREATE TABLE IF NOT EXISTS Dim_Peliculas (
     id_pelicula INT PRIMARY KEY,
     titulo VARCHAR(255),
     anio INT,
@@ -18,7 +18,7 @@ CREATE TABLE Dim_Peliculas (
 );
 
 -- Tabla Dim_Directores
-CREATE TABLE Dim_Directores (
+CREATE TABLE IF NOT EXISTS Dim_Directores (
     id_director INT PRIMARY KEY,
     nombre VARCHAR(255),
     fecha_nacimiento DATE,
@@ -26,12 +26,13 @@ CREATE TABLE Dim_Directores (
 );
 
 -- Tabla Fact_Table
-CREATE TABLE Fact_Table (
+CREATE TABLE IF NOT EXISTS Fact_Table (
     id_pelicula INT,
     id_director INT,
     id_tiempo DATE,
     prom_puntuacion FLOAT,
     cant_votos INT,
     popularidad FLOAT,
-    recaudacion FLOAT
+    recaudacion FLOAT,
+    PRIMARY KEY (id_pelicula, id_director, id_tiempo)
 );

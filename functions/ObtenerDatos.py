@@ -3,7 +3,8 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 import datetime
-from sqlalchemy  import create_engine
+from sqlalchemy import create_engine
+from pandas import read_sql_query
 
 load_dotenv()
 
@@ -14,13 +15,26 @@ DB_USER = os.getenv('DB_USER')
 DB_PASS = os.getenv('DB_PASS')
 DB_PORT = os.getenv('DB_PORT')
 
-def obtenerDatos(numPeliculas=50):
+fechas_data = []
+
+def obtenerDatos(numPeliculas=15):
     peliculas = obtenerPeliculas(numPeliculas)
 
     peliculas_data = []
     directores_data = []
-    fechas_data = []
     hechos_data = []
+
+    fecha_actual = datetime.date.today()
+    anio = fecha_actual.year
+    mes = fecha_actual.month
+    dia = fecha_actual.day
+
+    fechas_data.append({
+        'id_tiempo': fecha_actual,
+        'anio': anio,
+        'mes': mes,
+        'dia': dia
+    })
 
     for pelicula in peliculas:
         peliculas_data.append({
@@ -38,14 +52,6 @@ def obtenerDatos(numPeliculas=50):
             'nombre': pelicula['director']['nombre'],
             'fecha_nacimiento': pelicula['director']['fechaNacimiento'],
             'nacionalidad': pelicula['director']['nacionalidad']
-        })
-
-        fecha_actual = datetime.date.today()
-        fechas_data.append({
-            'id_tiempo': fecha_actual,
-            'anio': fecha_actual.year,
-            'mes': fecha_actual.month,
-            'dia': fecha_actual.day
         })
 
         hechos_data.append({
@@ -149,23 +155,48 @@ def cargarDatosEnRedshift(peliculas_df, directores_df, fecha_df, hechos_df):
     conn_str = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     conn = create_engine(conn_str)
 
+
     # Cargar los datos actuales de las tablas de Redshift en DataFrames
-    df_actual_peliculas = pd.read_sql_table('dim_peliculas', conn, schema='nadina_conte_coderhouse')
-    df_actual_directores = pd.read_sql_table('dim_directores', conn, schema='nadina_conte_coderhouse')
+    df_actual_peliculas = read_sql_query('SELECT id_pelicula FROM nadina_conte_coderhouse.dim_peliculas',con = conn)
+    df_actual_directores = read_sql_query('SELECT id_director FROM nadina_conte_coderhouse.dim_directores',con = conn)
+    df_actual_hechos = read_sql_query('SELECT id_pelicula,id_director,id_tiempo FROM nadina_conte_coderhouse.fact_table',con = conn)
 
     # Identificar nuevos registros a insertar en cada tabla
-    peliculas_nuevas = peliculas_df[~peliculas_df['id_pelicula'].isin(df_actual_peliculas['id_pelicula'])]
-    directores_nuevos = directores_df[~directores_df['id_director'].isin(df_actual_directores['id_director'])]
+    df_peliculas_nuevas = peliculas_df.merge(df_actual_peliculas, on='id_pelicula', how='left', indicator=True)
+    df_peliculas_nuevas = df_peliculas_nuevas[df_peliculas_nuevas['_merge'] == 'left_only'].drop('_merge', axis=1)
+
+
+    df_directores_nuevos = directores_df.merge(df_actual_directores, on='id_director', how='left', indicator=True)
+    df_directores_nuevos = df_directores_nuevos[df_directores_nuevos['_merge'] == 'left_only'].drop('_merge', axis=1)
+
+    df_hechos_nuevos = hechos_df.merge(df_actual_hechos, on=['id_director', 'id_pelicula', 'id_tiempo'], how='left',
+                                       indicator=True)
+    df_hechos_nuevos = df_hechos_nuevos[df_hechos_nuevos['_merge'] == 'left_only'].drop('_merge', axis=1)
+
+
+    # Mostrar datos
+    # DataFrame para fact_table
+    print("DataFrame hechos:")
+    print(df_hechos_nuevos)
+    # DataFrame para tabla película
+    print("\nDataFrame peliculas:")
+    print(df_peliculas_nuevas)
+    # DataFrame para tabla directores
+    print("\nDataFrame directores:")
+    print(df_directores_nuevos)
+    # DataFrame para tabla fecha
+    print("\nDataFrame fecha:")
+    print(fecha_df)
 
     # Insertar los nuevos registros en las tablas de Redshift
-    peliculas_nuevas.to_sql(name='dim_peliculas', con=conn, schema='nadina_conte_coderhouse',
-                            if_exists='append', index=False)
-    directores_nuevos.to_sql(name='dim_directores', con=conn, schema='nadina_conte_coderhouse',
-                             if_exists='append', index=False)
+    df_peliculas_nuevas.to_sql(name='dim_peliculas', con=conn, schema='nadina_conte_coderhouse', if_exists='append',
+                               index=False)
+    df_directores_nuevos.to_sql(name='dim_directores', con=conn, schema='nadina_conte_coderhouse', if_exists='append',
+                                index=False)
     fecha_df.to_sql(name='dim_tiempo', con=conn, schema='nadina_conte_coderhouse', if_exists='append', index=False)
-    hechos_df.to_sql(name='fact_table', con=conn, schema='nadina_conte_coderhouse', if_exists='append', index=False)
+    df_hechos_nuevos.to_sql(name='fact_table',con=conn,schema='nadina_conte_coderhouse',if_exists='append',index=False)
 
-if __name__ == '__main__':
+def main():
     # Opciones para mostrar completos los distintos DFs
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
@@ -173,20 +204,8 @@ if __name__ == '__main__':
 
     #Obtener datos para las distintas tablas
     peliculas_df, directores_df, fecha_df, hechos_df = obtenerDatos()
-
-    #Mostrar datos
-    # DataFrame para fact_table
-    print("DataFrame hechos:")
-    print(hechos_df)
-    # DataFrame para tabla película
-    print("\nDataFrame peliculas:")
-    print(peliculas_df)
-    # DataFrame para tabla directores
-    print("\nDataFrame directores:")
-    print(directores_df)
-    # DataFrame para tabla fecha
-    print("\nDataFrame fecha:")
-    print(fecha_df)
-
     # Cargar datos en Redshift
     cargarDatosEnRedshift(peliculas_df, directores_df, fecha_df, hechos_df)
+
+if __name__ == '__main__':
+    main()
