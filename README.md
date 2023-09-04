@@ -25,17 +25,17 @@ DB_PORT=mi_nro_puerto
 
 1. 
     ```bash
-    docker-compose.yaml build
+    docker-compose -f docker-compose.yaml build
     ```
 2. 
     ```bash
-    docker-compose.yaml up
+    docker-compose -f docker-compose.yaml up
     ```
-3. Entrar a [localhost:8080](http://localhost:8080/home) en el navegador que quieras.
+3. Entrar a [localhost:8080](http://localhost:8080/home) en el navegador que quiera.
 4. Introduce como usuario y contraseña: `airflow`.
 6. Una vez dentro, ejecute el DAG.
 7. Cuando el DAG queda en color verde oscuro indica que fue ejecutado satisfactoriamente, puede corrobar esto ingresando a Redshift y validando que dentro del esquema correspondiente, en la tabla fact_table esten los nuevos registros.
-7. Finalmente, cuando hayas terminado, podrá liberar los recursos utilizados mediante el siguiente comando:
+7. Finalmente, cuando haya terminado, podrá liberar los recursos utilizados mediante el siguiente comando:
     ```bash
-    docker-compose.yaml down
+    docker-compose -f docker-compose.yaml down
     ```
