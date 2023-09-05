@@ -14,3 +14,4 @@ RUN pip install pandas
 RUN pip install sqlalchemy 
 RUN pip install requests 
 RUN pip install datetime 
+RUN pip install SMTPEmail

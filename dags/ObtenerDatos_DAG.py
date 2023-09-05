@@ -9,39 +9,12 @@ import sys
 import os
 import pandas as pd
 import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 # from ..functions.ObtenerDatos import main
 
 # from functions.ObtenerDatos import main
-
-# Agregar la ruta de proyecto_de al sys.path
-proyecto_de_path = os.path.abspath(os.path.join(os.path.dirname(sys.path[0]), "Proyect_DE"))
-sys.path.insert(0, proyecto_de_path)
-
-
-# Cargar variables de entorno desde el archivo .env
-env_path = Path('.') / '.env'
-load_dotenv(dotenv_path=env_path)
-
-# Variables de conexión a Redshift y API_KEY
-DB_HOST = os.getenv('DB_HOST')
-DB_NAME = os.getenv('DB_NAME')
-DB_USER = os.getenv('DB_USER')
-DB_PASS = os.getenv('DB_PASS')
-DB_PORT = os.getenv('DB_PORT')
-API_KEY = os.getenv('API_KEY')
-
-
-def crear_tablas():
-    # Crear las tablas en Redshift
-    conn_str = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    conn = create_engine(conn_str)
-
-    sql_script_path = './scripts/creartablas.sql'
-    with conn.connect() as connection:
-        with open(sql_script_path, 'r') as f:
-            sql_script = f.read()
-        connection.execute(sql_script)
-
 
 load_dotenv()
 
@@ -51,6 +24,9 @@ DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('DB_USER')
 DB_PASS = os.getenv('DB_PASS')
 DB_PORT = os.getenv('DB_PORT')
+MY_MAIL = os.getenv('MY_MAIL')
+MY_MAIL_PASS = os.getenv('MY_MAIL_PASS')
+
 
 fechas_data = []
 
@@ -186,7 +162,6 @@ def obtenerIdiomaOriginal(data):
     return idiomaOriginal
 
 def cargarDatosEnRedshift(peliculas_df, directores_df, fecha_df, hechos_df):
-#    conn_str = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
     # Engine para la conexion a Redshift
     conn_str = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -244,7 +219,15 @@ def main():
     # Cargar datos en Redshift
     cargarDatosEnRedshift(peliculas_df, directores_df, fecha_df, hechos_df)
 
-
+def send_email(subject, body, sender, recipients, password):
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = ', '.join(recipients)
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
+       smtp_server.login(sender, password)
+       smtp_server.sendmail(sender, recipients, msg.as_string())
+    print("Message sent!")
 
 # Definición del DAG
 default_args = {
@@ -269,5 +252,20 @@ with DAG('obtener_datos_dag',
         provide_context=True,
         dag=dag
     )   
+    
+    def enviar_mail(**kwargs):
+        subject = "Alerta - Proceso Carga Datos TMBD - Redshift"
+        body = "Se han cargado correctamente los datos en Redshift."
+        sender = f'{MY_MAIL}'
+        recipients = ["nadina_conte@hotmail.com"]
+        password = f'{MY_MAIL_PASS}'
+        send_email(subject, body, sender, recipients, password)
 
-    ObtenerDatos
+    EnviarEmail = PythonOperator(
+        task_id='send_email',
+        python_callable=enviar_mail,
+        provide_context=True,
+        dag=dag
+    )   
+
+    ObtenerDatos >> EnviarEmail
